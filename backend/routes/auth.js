@@ -12,6 +12,7 @@ const { createAttemptLimit, minutesFrom } = require('../lib/attemptLimit');
 const { isHuman } = require('../lib/humanCheck');
 const { siteAddress } = require('../lib/siteAddress');
 const companies = require('../lib/companies');
+const legal = require('../lib/legal');
 
 const RESET_MINUTES = 60;
 // A reset link can take over an account, so a flood of them is worth stopping even though
@@ -49,6 +50,10 @@ function publicUser(user) {
     id: user.id, email: user.email, name: user.name,
     address: user.address ?? null, company: user.company ?? null, phone: user.phone ?? null,
     role: user.role, isPlatformAdmin: user.role === 'superadmin',
+    // Whether they have accepted the Terms and Privacy Policy in force now. Until they have, the
+    // app shows only the acceptance screen, and the server refuses everything else.
+    termsAccepted: legal.hasAccepted(user.id),
+    termsUpdated: !legal.hasAccepted(user.id) && legal.acceptedBefore(user.id),
   };
 }
 
@@ -126,6 +131,25 @@ router.get('/me', (req, res) => {
     // A person who signed up and is waiting for their company's admin to let them in.
     pendingJoin: companies.pendingJoinFor(user.id),
   });
+});
+
+// The documents to accept and the statements to tick — for the acceptance screen.
+router.get('/legal', (req, res) => {
+  res.json({ documents: legal.CURRENT, statements: legal.STATEMENTS });
+});
+
+// Accepting the Terms of Service and Privacy Policy: the statement ticked, by the person
+// themselves. Recorded with the versions, the time, where from and on what browser.
+router.post('/accept-terms', (req, res) => {
+  const user = userFromToken(req);
+  if (!user) return res.status(401).json({ error: 'Login required' });
+  if (req.body?.agree_terms !== true) {
+    return res.status(400).json({ error: 'Tick the box to agree before continuing.' });
+  }
+  if (!legal.hasAccepted(user.id)) {
+    legal.record(user, req, legal.acceptedBefore(user.id) ? 're-acceptance prompt' : 'acceptance prompt');
+  }
+  res.json({ user: publicUser(user) });
 });
 
 // A person's own details. Everything here belongs to the ACCOUNT rather than to an

@@ -41,6 +41,11 @@ async function main() {
   const outsider = (await call('POST', '/auth/login',
     { body: { email: 'iso-outsider@test.invalid', password: 'outsider-pass-123' } })).body;
   check('outsider can sign in', !!outsider.token);
+  // Past the Terms of Service screen, or every call below is refused for that reason instead and
+  // the checks pass without testing anything.
+  const accepted = await call('POST', '/auth/accept-terms',
+    { token: outsider.token, body: { agree_terms: true } });
+  check('outsider accepts the terms', accepted.status === 200, String(accepted.status));
 
   const orgA = db.prepare('SELECT id FROM organizations WHERE id <> ? ORDER BY id LIMIT 1').get(orgB);
   const review = db.prepare('SELECT id FROM pay_app_reviews LIMIT 1').get();

@@ -1027,6 +1027,28 @@ db.exec(`
     BEGIN SELECT RAISE(ABORT, 'audit records cannot be changed'); END;
   CREATE TRIGGER IF NOT EXISTS audit_log_no_delete BEFORE DELETE ON audit_log
     BEGIN SELECT RAISE(ABORT, 'audit records cannot be deleted'); END;
+
+  -- Each time a person accepts the Terms of Service and Privacy Policy, with the exact versions
+  -- (docs/legal/). Kept like the audit record: never changed, never deleted — not even when the
+  -- account or its organization is — because it is the evidence the person agreed. No foreign key
+  -- to users for the same reason.
+  CREATE TABLE IF NOT EXISTS legal_acceptances (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    email TEXT NOT NULL,
+    terms_version TEXT NOT NULL,
+    privacy_version TEXT NOT NULL,
+    dpa_version TEXT,
+    accepted_at_utc TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+    ip_address TEXT,
+    user_agent TEXT,
+    acceptance_source TEXT NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS idx_legal_acceptances_user ON legal_acceptances(user_id, id);
+  CREATE TRIGGER IF NOT EXISTS legal_acceptances_no_update BEFORE UPDATE ON legal_acceptances
+    BEGIN SELECT RAISE(ABORT, 'acceptance records cannot be changed'); END;
+  CREATE TRIGGER IF NOT EXISTS legal_acceptances_no_delete BEFORE DELETE ON legal_acceptances
+    BEGIN SELECT RAISE(ABORT, 'acceptance records cannot be deleted'); END;
 `);
 
 // A project has more than one agreement — the architect's, the general contractor's, often an

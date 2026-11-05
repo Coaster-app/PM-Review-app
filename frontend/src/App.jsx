@@ -14,6 +14,7 @@ import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
 import Signup from './pages/Signup';
 import ConfirmEmail from './pages/ConfirmEmail';
+import TermsGate from './components/TermsGate';
 import { authApi, selectedOrg, selectedProgram } from './api';
 
 // The hierarchy is always Organization -> Program -> Project, so navigation mirrors it:
@@ -23,7 +24,8 @@ import { authApi, selectedOrg, selectedProgram } from './api';
 
 function RequireAuth({ children }) {
   if (!authApi.isLoggedIn()) return <Navigate to="/login" replace />;
-  return children;
+  // Signed in is not enough: the Terms of Service and Privacy Policy come first.
+  return <TermsGate>{children}</TermsGate>;
 }
 
 // Each level is meaningless without the one above it, so send the user back to whichever

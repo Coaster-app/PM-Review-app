@@ -2,7 +2,7 @@ const path = require('path');
 require('dotenv').config({ path: path.join(__dirname, '.env'), override: true });
 const express = require('express');
 const cors = require('cors');
-const { requireAuth } = require('./middleware/auth');
+const { requireAuth, requireTerms } = require('./middleware/auth');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -50,6 +50,8 @@ app.use('/api/invitations', require('./routes/invitations'));
 
 // Everything below requires a valid login session
 app.use('/api', requireAuth);
+// …and has accepted the current Terms of Service and Privacy Policy (lib/legal.js).
+app.use('/api', requireTerms);
 
 // Background work, for every module that has any. See routes/jobs.js.
 app.use('/api/jobs', require('./routes/jobs'));

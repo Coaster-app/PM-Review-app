@@ -43,6 +43,11 @@ api.interceptors.request.use(config => {
 api.interceptors.response.use(
   res => res,
   err => {
+    // The Terms of Service and Privacy Policy have not been accepted — a new person, or a new
+    // version since they last did. The acceptance screen (components/TermsGate.jsx) takes over.
+    if (err.response?.status === 403 && err.response?.data?.code === 'terms_required') {
+      window.dispatchEvent(new Event('coaster:terms-required'));
+    }
     const isLoginCall = err.config?.url?.includes('/auth/login');
     if (err.response?.status === 401 && !isLoginCall) {
       localStorage.removeItem(TOKEN_KEY);
@@ -119,6 +124,12 @@ export const authApi = {
   getConfirmation: token => api.get(`/auth/confirm-email/${token}`).then(r => r.data),
   confirmEmail: (token, password) => api.post(`/auth/confirm-email/${token}`, { password }).then(r => {
     localStorage.setItem(TOKEN_KEY, r.data.token);
+    localStorage.setItem(USER_KEY, JSON.stringify(r.data.user));
+    return r.data;
+  }),
+  // The Terms of Service and Privacy Policy: what to accept, and accepting them.
+  legal: () => api.get('/auth/legal').then(r => r.data),
+  acceptTerms: data => api.post('/auth/accept-terms', data).then(r => {
     localStorage.setItem(USER_KEY, JSON.stringify(r.data.user));
     return r.data;
   }),

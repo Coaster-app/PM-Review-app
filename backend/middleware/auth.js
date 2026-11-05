@@ -75,6 +75,16 @@ function requireOrgWork(req, res, next) {
 }
 
 // Vendor-only areas (creating customer organizations).
+// Nothing in the app until the current Terms of Service and Privacy Policy are accepted. Runs
+// after requireAuth on every route below it; accepting itself is under /api/auth, which this does
+// not cover.
+function requireTerms(req, res, next) {
+  if (!require('../lib/legal').hasAccepted(req.user.id)) {
+    return res.status(403).json({ error: 'Accept the Terms of Service and Privacy Policy to continue.', code: 'terms_required' });
+  }
+  next();
+}
+
 function requirePlatformAdmin(req, res, next) {
   if (!access.isPlatformAdmin(req.user)) {
     return res.status(403).json({ error: 'You do not have permission to do that' });
@@ -89,5 +99,5 @@ function programInOrg(programId, orgId) {
 }
 
 module.exports = {
-  requireAuth, requireOrg, requireOrgAdmin, requireOrgWork, requirePlatformAdmin, programInOrg,
+  requireAuth, requireTerms, requireOrg, requireOrgAdmin, requireOrgWork, requirePlatformAdmin, programInOrg,
 };
