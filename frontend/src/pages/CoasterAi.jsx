@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import {
   SparklesIcon, PaperClipIcon, PaperAirplaneIcon, TrashIcon, PlusIcon,
-  XMarkIcon, DocumentIcon, ChatBubbleLeftRightIcon, BoltIcon,
+  XMarkIcon, DocumentIcon, ChatBubbleLeftRightIcon, BoltIcon, ClipboardDocumentIcon, CheckIcon,
 } from '@heroicons/react/24/outline';
 import { coasterAiApi, projectsApi, payAppReviewApi } from '../api';
 import { WORD_TEMPLATES } from '../wordTemplates';
@@ -59,9 +59,60 @@ function inline(text) {
   });
 }
 
+// The answer as someone would want it in an email or a Word document: the markdown marks taken
+// out, bullets kept as bullets.
+function plainText(text) {
+  return String(text || '')
+    .split('\n')
+    .map(l => l.replace(/^#{1,6}\s+/, '').replace(/^(\s*)[-*•]\s+/, '$1• '))
+    .join('\n')
+    .replace(/\*\*([^*]+)\*\*/g, '$1')
+    .replace(/`([^`]+)`/g, '$1')
+    .trim();
+}
+
+// Copies the whole answer. Rich text goes on the clipboard alongside the plain text, so pasting
+// into Outlook or Word keeps the bold and the bullets, and pasting into a plain box still reads.
+function CopyAnswer({ text, answerRef }) {
+  const [copied, setCopied] = useState(false);
+  const copy = async () => {
+    const plain = plainText(text);
+    try {
+      const html = answerRef.current?.innerHTML;
+      if (html && window.ClipboardItem) {
+        await navigator.clipboard.write([new window.ClipboardItem({
+          'text/plain': new Blob([plain], { type: 'text/plain' }),
+          'text/html': new Blob([html], { type: 'text/html' }),
+        })]);
+      } else {
+        await navigator.clipboard.writeText(plain);
+      }
+    } catch {
+      // Older browsers, or a page without clipboard permission.
+      const box = document.createElement('textarea');
+      box.value = plain;
+      box.style.position = 'fixed'; box.style.opacity = '0';
+      document.body.appendChild(box); box.select();
+      document.execCommand('copy');
+      box.remove();
+    }
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+  return (
+    <button type="button" onClick={copy} title="Copy the whole response"
+      className="inline-flex items-center gap-1 mt-1.5 px-2 py-1 rounded-lg text-[11px] text-gray-500 hover:text-gray-800 hover:bg-gray-100">
+      {copied
+        ? <><CheckIcon className="w-3.5 h-3.5" style={{ color: '#15803d' }} /> Copied</>
+        : <><ClipboardDocumentIcon className="w-3.5 h-3.5" /> Copy</>}
+    </button>
+  );
+}
+
 function Bubble({ message, streaming }) {
   const mine = message.role === 'user';
   const tier = TIER_STYLE[message.tier];
+  const answerRef = useRef(null);
   return (
     <div className={`flex ${mine ? 'justify-end' : 'justify-start'}`}>
       <div className={`max-w-[85%] ${mine ? '' : 'w-full'}`}>
@@ -88,9 +139,10 @@ function Bubble({ message, streaming }) {
           )}
           {mine
             ? <p className="text-[13.5px] leading-relaxed whitespace-pre-wrap">{message.content}</p>
-            : <Answer text={message.content} />}
+            : <div ref={answerRef}><Answer text={message.content} /></div>}
           {streaming && <span className="inline-block w-1.5 h-4 ml-0.5 align-middle animate-pulse" style={{ background: '#6366f1' }} />}
         </div>
+        {!mine && !streaming && message.content && <CopyAnswer text={message.content} answerRef={answerRef} />}
       </div>
     </div>
   );
